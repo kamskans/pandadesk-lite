@@ -5,14 +5,28 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "dev": "wrangler d1 migrations apply DB --local && wrangler dev",
     "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p ui",
     "test": "node --test test/*.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261012.1",
     "typescript": "5.9.3",
-    "wrangler": "4.149.0"
+    "wrangler": "4.149.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.4"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "lucide-react": "1.61.0",
+    "marked": "18.1.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }

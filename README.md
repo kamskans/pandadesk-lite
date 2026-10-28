@@ -32,7 +32,7 @@ npm run deploy
 Then open `https://<your-worker>.workers.dev/admin`, sign in, add your website under **Knowledge**, and copy the snippet from **Install** into your site:
 
 ```html
-<script src="https://<your-worker>.workers.dev/widget.js" defer></script>
+<script src="https://<your-worker>.workers.dev/widget.js" async></script>
 ```
 
 ## Settings
@@ -57,7 +57,7 @@ Variables (in `wrangler.jsonc`):
 
 ## How it works
 
-One Cloudflare Worker serves the widget, the chat, the admin page and the API.
+One Cloudflare Worker serves the widget, the chat, the admin page and the API. The chat and admin are React and Tailwind, built from `ui/` into `dist/` with Vite before every `wrangler dev` and `wrangler deploy`.
 
 - **Data:** conversations and knowledge are stored in **D1**. Passages are indexed in D1's full-text search and in **Vectorize**.
 - **Embeddings:** made with Workers AI (`@cf/baai/bge-m3`, multilingual).
@@ -70,7 +70,7 @@ On the Workers Free plan, small sites work fine. Large sites read faster on Work
 ```bash
 npm install
 cp .dev.vars.example .dev.vars   # set ADMIN_PASSWORD
-npm run dev                      # http://localhost:8787/admin
+npm run dev                      # builds ui/, then http://localhost:8787/admin
 npm test && npm run typecheck
 ```
 
