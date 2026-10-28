@@ -29,7 +29,7 @@ npx wrangler secret put LLM_API_KEY      # optional: leave out to use Workers AI
 npm run deploy
 ```
 
-Then open `https://<your-worker>.workers.dev/admin`, sign in, add your website under **Knowledge**, and copy the snippet from **Install** into your site:
+The Worker's home page describes PandaDesk Lite and has a live demo of your chat; change it in `ui/src/home.tsx`. Then open `https://<your-worker>.workers.dev/admin`, sign in, add your website under **Knowledge**, and copy the snippet from **Install** into your site:
 
 ```html
 <script src="https://<your-worker>.workers.dev/widget.js" async></script>
@@ -57,7 +57,7 @@ Variables (in `wrangler.jsonc`):
 
 ## How it works
 
-One Cloudflare Worker serves the widget, the chat, the admin page and the API. The chat and admin are React and Tailwind, built from `ui/` into `dist/` with Vite before every `wrangler dev` and `wrangler deploy`.
+One Cloudflare Worker serves the home page, the widget, the chat, the admin page and the API. The pages are React and Tailwind, built from `ui/` into `dist/` with Vite before every `wrangler dev` and `wrangler deploy`.
 
 - **Data:** conversations and knowledge are stored in **D1**. Passages are indexed in D1's full-text search and in **Vectorize**.
 - **Embeddings:** made with Workers AI (`@cf/baai/bge-m3`, multilingual).
