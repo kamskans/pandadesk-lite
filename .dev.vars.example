@@ -1,0 +1,8 @@
+# Password for /admin. Required.
+ADMIN_PASSWORD=
+# Key for LLM_BASE_URL (OpenRouter, OpenAI, Anthropic...). Optional: without it, answers use Workers AI.
+LLM_API_KEY=
+# Optional: email the team when a visitor asks for a person, and email visitors your replies. Uses Resend.
+RESEND_API_KEY=
+EMAIL_FROM=
+NOTIFY_EMAIL=

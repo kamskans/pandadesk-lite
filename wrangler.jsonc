@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pandadesk-lite",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "pandadesk-lite", "migrations_dir": "migrations" }],
+  // Search by meaning. Create the index once before the first deploy:
+  //   npx wrangler vectorize create pandadesk-lite --dimensions=1024 --metric=cosine
+  // Without it, search falls back to keywords.
+  "vectorize": [{ "binding": "VECTORS", "index_name": "pandadesk-lite" }],
+  "ai": { "binding": "AI" },
+  // Re-reads your website and works through pages waiting to be read.
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "vars": {
+    "SITE_NAME": "Support",
+    // Any OpenAI-compatible API: OpenRouter, OpenAI, Anthropic, Groq... Leave LLM_API_KEY unset to use Workers AI.
+    "LLM_BASE_URL": "https://openrouter.ai/api/v1",
+    "LLM_MODEL": "openai/gpt-4o-mini",
+    "MAX_PAGES": "300"
+  },
+  "observability": { "enabled": true }
+}
