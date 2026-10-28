@@ -28,7 +28,7 @@ export default function Messenger({ config, embedded = true, preview = false }: 
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const conv = useRef(preview ? null : load());
-  const bottom = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const shown = useRef(!embedded);
   const sending = useRef(false);
@@ -87,7 +87,8 @@ export default function Messenger({ config, embedded = true, preview = false }: 
     return () => { clearInterval(t); window.removeEventListener("message", onMessage); };
   }, [poll, preview, embedded, config.color]);
 
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, pending]);
+  // Scroll the message list only: scrollIntoView would also scroll the page around an embedded chat.
+  useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" }); }, [messages.length, pending]);
 
   async function send(text?: string) {
     const body = (text ?? draft).trim();
@@ -136,7 +137,7 @@ export default function Messenger({ config, embedded = true, preview = false }: 
         )}
       </header>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div ref={log} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <Bubble side="left" label={botName}>{config.greeting}</Bubble>
         {!messages.length && !pending && config.starters.length > 0 && (
           <div className="flex flex-col items-end gap-1.5" aria-label="Suggested questions">
@@ -181,7 +182,6 @@ export default function Messenger({ config, embedded = true, preview = false }: 
             </button>
           </div>
         )}
-        <div ref={bottom} />
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); send(); }} className="border-t border-stone-200 p-3">
