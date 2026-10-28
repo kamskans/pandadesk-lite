@@ -194,6 +194,12 @@ export async function processPending(env: Env) {
 async function readPage(env: Env, page: { id: number; source_id: number; url: string; hash: string | null }) {
   const src = await env.DB.prepare("select url from sources where id = ?").bind(page.source_id).first<{ url: string }>();
   if (!src) return;
+  // Pages saved before a crawl rule changed (an llms.txt, say) are dropped instead of read again.
+  if (!sameSiteUrl(page.url, new URL(src.url), scopeOf(new URL(src.url)))) {
+    await dropChunks(env, "page_id = ?", [page.id]);
+    await env.DB.prepare("delete from pages where id = ?").bind(page.id).run();
+    return;
+  }
   try {
     const got = await fetchPage(page.url);
     const start = new URL(src.url);

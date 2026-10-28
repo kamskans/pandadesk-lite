@@ -31,4 +31,6 @@ test("sameSiteUrl keeps pages on the site and drops the rest", () => {
   assert.equal(sameSiteUrl("/blog/post", base, "/guide"), null);
   assert.equal(sameSiteUrl("/guide/logo.png", base, "/guide"), null);
   assert.equal(sameSiteUrl("mailto:a@b.com", base, "/"), null);
+  assert.equal(sameSiteUrl("/guide/llms-full.txt", base, "/guide"), null);
+  assert.equal(sameSiteUrl("/guide/notes.txt", base, "/guide"), "https://docs.example.com/guide/notes.txt");
 });

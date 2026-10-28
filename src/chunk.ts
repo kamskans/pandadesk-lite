@@ -59,6 +59,8 @@ export function sameSiteUrl(href: string, base: URL, scope: string): string | nu
   let u: URL;
   try { u = new URL(href, base); } catch { return null; }
   if (!/^https?:$/.test(u.protocol) || u.host !== base.host || !u.pathname.startsWith(scope)) return null;
+  // llms.txt files repeat the whole site in one file, so they'd crowd out the pages they copy.
+  if (/\/llms(-full|-small)?\.txt$/i.test(u.pathname)) return null;
   if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|mjs|json|xml|zip|gz|mp4|mp3|woff2?|ttf|pdf)$/i.test(u.pathname)) return null;
   u.hash = "";
   for (const k of [...u.searchParams.keys()]) if (/^(utm_|ref$|fbclid$|gclid$)/.test(k)) u.searchParams.delete(k);
