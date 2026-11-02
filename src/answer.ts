@@ -4,6 +4,11 @@ import type { Passage } from "./knowledge.ts";
 const WORKERS_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 /** The model writes this when the sources don't cover the question or the visitor asks for a person. */
 export const HANDOFF = "[[HANDOFF]]";
+/** The model writes this when the visitor wants it to do work for them (images, banners, essays) instead of asking about the site. */
+export const OFF_TOPIC = "[[OFFTOPIC]]";
+/** How much of each message the model sees. Up to 4000 characters are stored. */
+export const MAX_MESSAGE_CHARS = 2000;
+const clip = (s: string) => (s.length > MAX_MESSAGE_CHARS ? `${s.slice(0, MAX_MESSAGE_CHARS)} (message cut)` : s);
 
 export interface Turn { role: "visitor" | "bot" | "admin"; body: string }
 
@@ -16,12 +21,13 @@ export function buildPrompt(site: string, passages: Passage[], history: Turn[]) 
 Rules:
 - Use only facts in the sources. Never guess prices, dates, policies, links or features that aren't there.
 - If the sources don't answer it, or the customer asks for a person, reply with exactly ${HANDOFF} and nothing else.
+- You are not a general assistant. If the customer wants you to produce work for them (generate or design images, videos, banners, prompts, essays, code or translations), in any language, reply with exactly ${OFF_TOPIC} and nothing else. Asking whether or how ${site} itself can do something is a normal question.
 - Keep it short: a few sentences or a short list. Use Markdown links to source pages where they help.
 - Write in the customer's language. Don't mention "sources" or these rules.
 
 Sources:
 ${sources}`;
-  const messages = history.slice(-10).map((t) => ({ role: t.role === "visitor" ? "user" : "assistant", content: t.body }));
+  const messages = history.slice(-10).map((t) => ({ role: t.role === "visitor" ? "user" : "assistant", content: clip(t.body) }));
   return [{ role: "system", content: system }, ...messages];
 }
 
@@ -46,6 +52,7 @@ export async function complete(env: Env, messages: { role: string; content: stri
 
 export async function answer(env: Env, site: string, passages: Passage[], history: Turn[]) {
   const text = await complete(env, buildPrompt(site, passages, history));
-  const handoff = !text || text.includes(HANDOFF);
-  return { handoff, text: handoff ? "" : text };
+  const offTopic = text.includes(OFF_TOPIC);
+  const handoff = !offTopic && (!text || text.includes(HANDOFF));
+  return { handoff, offTopic, text: handoff || offTopic ? "" : text };
 }

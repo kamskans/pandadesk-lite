@@ -89,9 +89,14 @@
     queue.forEach(function (args) { api.apply(null, args); });
   }
 
+  var unavailable = false;
   fetch(origin + "/api/config")
     .then(function (r) { return r.json(); })
-    .then(function (cfg) { if (cfg.color) button.style.background = cfg.color; if (cfg.textColor) textColor = cfg.textColor; })
+    .then(function (cfg) {
+      // The site turned the chat off for this visitor's country: don't show the button.
+      if (cfg.unavailable) { unavailable = true; return; }
+      if (cfg.color) button.style.background = cfg.color; if (cfg.textColor) textColor = cfg.textColor;
+    })
     .catch(function () { /* keep the default look */ })
-    .then(function () { if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount); });
+    .then(function () { if (unavailable) return; if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount); });
 })();

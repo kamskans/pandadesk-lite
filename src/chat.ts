@@ -1,11 +1,18 @@
 import { answer, type Turn } from "./answer.ts";
+import { block, blocked, countryBlocked, ipKey, screen, STRIKE_REPLIES, STRIKES_TO_CLOSE, type Strike } from "./abuse.ts";
 import { sendEmail } from "./email.ts";
 import { HttpError, body, json, now, str, type Env } from "./env.ts";
 import { ftsQuery, search } from "./knowledge.ts";
-import { clientIp, limit, randomToken, same, sha256 } from "./security.ts";
+import { clientIp, hit, limit, randomToken, same, sha256 } from "./security.ts";
 import { getSettings } from "./settings.ts";
 
-export interface Conversation { id: string; token_hash: string; email: string | null; name: string | null; status: string; unread: number; page_url: string | null; created_at: number; updated_at: number }
+export interface Conversation { id: string; token_hash: string; email: string | null; name: string | null; status: string; unread: number; strikes: number; page_url: string | null; created_at: number; updated_at: number }
+
+/** AI turns one chat may use, and one address per day, before the team takes over. */
+export const AI_TURNS_PER_CHAT = 15;
+export const AI_TURNS_PER_ADDRESS_DAY = 40;
+const UNAVAILABLE = "Chat isn't available in your region.";
+const PAUSED = "This chat is paused after repeated abusive or spam messages. Try again later.";
 export interface Message { id: number; role: string; body: string; sources: string | null; created_at: number }
 
 const visible = (m: Message) => ({ id: m.id, role: m.role, body: m.body, sources: m.sources ? JSON.parse(m.sources) : [], at: m.created_at });
@@ -42,8 +49,27 @@ async function notifyTeam(req: Request, env: Env, conv: Conversation, latest: st
   await sendEmail(env, env.NOTIFY_EMAIL, `${who} is waiting for a reply`, `${who} wrote:\n\n${latest}\n\nReply: ${adminLink(req, conv.id)}`, conv.email ?? undefined);
 }
 
+/** Count one AI answer against the site's daily limit, and email you at 80% and 100% (once a day each). */
+async function spendDailyAnswer(req: Request, env: Env) {
+  const max = Math.max(0, Number(env.AI_DAILY_LIMIT ?? 500) || 0);
+  const ok = await hit(env, "ai:day", max, 86_400);
+  const row = await env.DB.prepare("select count from rate where key = 'ai:day'").first<{ count: number }>();
+  const used = row?.count ?? 0;
+  const level = max > 0 && used >= max ? 100 : max > 0 && used >= Math.ceil(max * 0.8) ? 80 : 0;
+  if (level && env.NOTIFY_EMAIL && (await hit(env, `ai-alert:${level}`, 1, 86_400))) {
+    const text = level === 100
+      ? `Your chat has used all ${max} of today's AI answers. For the next 24 hours, new questions go to you without an AI answer.`
+      : `Your chat has used ${used} of today's ${max} AI answers. After ${max}, new questions go to you without an AI answer.`;
+    await sendEmail(env, env.NOTIFY_EMAIL, level === 100 ? "AI answers used up for today" : "80% of today's AI answers used",
+      `${text}\n\nIf that's more than usual, check the inbox for a visitor sending a lot of messages. Change the limit with AI_DAILY_LIMIT.\n\n${new URL(req.url).origin}/admin`);
+  }
+  return ok;
+}
+
 export async function handleChat(req: Request, env: Env, path: string[]): Promise<Response> {
   const ip = clientIp(req);
+  // Turned off for this visitor's country: the widget doesn't mount on a 403 from /config.
+  if (countryBlocked(req, env)) return json({ error: UNAVAILABLE, unavailable: true }, 403, { "access-control-allow-origin": "*" });
   if (path[0] === "config" && req.method === "GET") {
     const s = await getSettings(env);
     // The widget script reads the colour from the customer's own site, so this public endpoint allows any origin.
@@ -53,6 +79,7 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
 
   if (path.length === 1 && req.method === "POST") {
     await limit(env, `start:${ip}`, 20, 3600);
+    if (await blocked(env, ip)) throw new HttpError(403, PAUSED);
     const input = await body(req, 5000);
     const id = crypto.randomUUID();
     const token = randomToken();
@@ -74,6 +101,7 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
   if (action === "messages" && req.method === "POST") {
     await limit(env, `msg:${ip}`, 30, 600);
     await limit(env, `msg:${conv.id}`, 60, 3600);
+    if (conv.strikes >= STRIKES_TO_CLOSE || (await blocked(env, ip))) throw new HttpError(403, PAUSED);
     const text = str((await body(req, 10_000)).body, 4000);
     if (!text) throw new HttpError(400, "write a message first");
     const mine = await addMessage(env, conv.id, "visitor", text);
@@ -92,7 +120,34 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
     const history = past.reverse();
     const asked = history.filter((t) => t.role === "visitor").map((t) => t.body);
     const site = (await getSettings(env)).name;
-    let reply: { handoff: boolean; text: string };
+
+    /** A calm reply with no AI call; the third strike closes the chat and blocks the address. */
+    const strike = async (kind: Strike, reply?: string) => {
+      const row = await env.DB.prepare("update conversations set strikes = strikes + 1, updated_at = ? where id = ? returning strikes").bind(now(), conv.id).first<{ strikes: number }>();
+      if ((row?.strikes ?? 1) >= STRIKES_TO_CLOSE) {
+        await env.DB.prepare("update conversations set status = 'closed' where id = ?").bind(conv.id).run();
+        await block(env, ip);
+        out.push(visible(await addMessage(env, conv.id, "bot", "This chat has been closed.")));
+        return json({ status: "closed", messages: out });
+      }
+      out.push(visible(await addMessage(env, conv.id, "bot", reply ?? STRIKE_REPLIES[kind](site))));
+      return json({ status: "bot", messages: out });
+    };
+    const rule = screen(text, asked.slice(0, -1));
+    if (rule) return strike(rule);
+
+    // Caps per chat and per address, then the site's daily limit: past any of them, you take over without the AI.
+    const addr = await ipKey(ip);
+    const capped = !(await hit(env, `ai:chat:${conv.id}`, AI_TURNS_PER_CHAT, 30 * 86_400))
+      || (!!addr && !(await hit(env, `ai:ip:${addr}`, AI_TURNS_PER_ADDRESS_DAY, 86_400)))
+      || !(await spendDailyAnswer(req, env));
+    if (capped) {
+      await handOff(req, env, conv, text);
+      const msg = conv.email ? "I've passed your question to the team. They'll reply here and by email." : "I've passed your question to the team. Leave your email and they'll get back to you.";
+      out.push(visible(await addMessage(env, conv.id, "bot", msg)));
+      return json({ status: "waiting", messages: out });
+    }
+    let reply: { handoff: boolean; offTopic?: boolean; text: string };
     let passages: Awaited<ReturnType<typeof search>> = [];
     try {
       // Search for the latest message; a short follow-up ("and for teams?") also needs the one before it.
@@ -103,6 +158,7 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
       console.error("answering failed:", (err as Error).message);
       reply = { handoff: true, text: "" };
     }
+    if (reply.offTopic) return strike("free_work");
     if (reply.handoff) {
       await handOff(req, env, conv, text);
       const msg = conv.email

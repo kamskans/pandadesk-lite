@@ -12,6 +12,10 @@ export interface Env {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   NOTIFY_EMAIL?: string;
+  /** AI answers per day before new questions go straight to you (default 500). */
+  AI_DAILY_LIMIT?: string;
+  /** Two-letter country codes the chat is turned off for, e.g. "PK, BD". */
+  BLOCKED_COUNTRIES?: string;
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
@@ -22,7 +26,8 @@ export const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
 export const fail = (status: number, error: string) => json({ error }, status);
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
 /** Read a JSON body no bigger than `max` bytes. */

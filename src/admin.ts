@@ -5,6 +5,7 @@ import { HttpError, body, json, now, str, type Env } from "./env.ts";
 import { addText, addWebsite, processPending, queueResync, removePinned, removeSource, savePinned, search } from "./knowledge.ts";
 import { adminCookie, clearAdminCookie, clientIp, isAdmin, limit, same } from "./security.ts";
 import { getSettings, saveSettings } from "./settings.ts";
+import { blockedCountries } from "./abuse.ts";
 
 const id = (s: string | undefined) => {
   const n = Number(s);
@@ -29,7 +30,7 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
   const [section, sub, action] = path;
   const m = req.method;
 
-  if (section === "me") return json({ ok: true, llm: env.LLM_API_KEY ? env.LLM_MODEL : "Workers AI", vectors: !!env.VECTORS, email: !!(env.RESEND_API_KEY && env.EMAIL_FROM), notify: env.NOTIFY_EMAIL ?? null });
+  if (section === "me") return json({ ok: true, llm: env.LLM_API_KEY ? env.LLM_MODEL : "Workers AI", vectors: !!env.VECTORS, email: !!(env.RESEND_API_KEY && env.EMAIL_FROM), notify: env.NOTIFY_EMAIL ?? null, aiDailyLimit: Math.max(0, Number(env.AI_DAILY_LIMIT ?? 500) || 0), blockedCountries: blockedCountries(env) });
 
   if (section === "conversations" && !sub && m === "GET") {
     const status = new URL(req.url).searchParams.get("status") ?? "active";

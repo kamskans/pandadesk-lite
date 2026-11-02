@@ -54,6 +54,8 @@ Variables (in `wrangler.jsonc`):
 | `LLM_MODEL` | `openai/gpt-4o-mini` | The model name for that API. |
 | `SITE_NAME` | `Support` | Default chat title. You can change it in the admin. |
 | `MAX_PAGES` | `300` | Most pages read per website. |
+| `AI_DAILY_LIMIT` | `500` | AI answers per day. After that, new questions go straight to you. With `NOTIFY_EMAIL` set, you're emailed at 80% and 100%. |
+| `BLOCKED_COUNTRIES` | (empty) | Two-letter country codes to turn the chat off for, e.g. `PK, BD`. The button doesn't appear there. Cloudflare provides each visitor's country, though a VPN can get around it. |
 
 ## How it works
 
@@ -61,6 +63,7 @@ One Cloudflare Worker serves the home page, the widget, the chat, the admin page
 
 - **Data:** conversations and knowledge are stored in **D1**. Passages are indexed in D1's full-text search and in **Vectorize**.
 - **Embeddings:** made with Workers AI (`@cf/baai/bge-m3`, multilingual).
+- **Abuse protection:** abuse, link spam, repeated messages and requests to make images or other work for free get a short reply with no AI call. The third closes the chat and blocks the visitor's address (stored hashed) for a day, or a month the second time. Each chat gets at most 15 AI answers and each address 40 a day. Once a chat is handed to you, the AI stops answering it.
 - **Background work:** a cron trigger runs every 10 minutes. It reads pages that are waiting and re-reads each website once a day. While the Knowledge page is open, pages are read straight away.
 
 On the Workers Free plan, small sites work fine. Large sites read faster on Workers Paid.

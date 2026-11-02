@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Check, Minus } from "lucide-react";
 import { api } from "./api";
 
-interface Me { llm: string; vectors: boolean; email: boolean; notify: string | null }
+interface Me { llm: string; vectors: boolean; email: boolean; notify: string | null; aiDailyLimit: number; blockedCountries: string[] }
+
+const countryName = (code: string) => { try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code; } catch { return code; } };
 
 function Row({ on, title, children }: { on: boolean; title: string; children: React.ReactNode }) {
   return (
@@ -32,6 +34,11 @@ export default function Settings() {
         <Row on title="AI model">Answers use {me.llm}. Set <code>LLM_API_KEY</code>, <code>LLM_BASE_URL</code> and <code>LLM_MODEL</code> to use your own provider.</Row>
         <Row on={me.vectors} title="Search by meaning">{me.vectors ? "On (Cloudflare Vectorize)." : "Off: create the Vectorize index from the README. Keyword search still works."}</Row>
         <Row on={me.email} title="Email to visitors">{me.email ? "Your replies are also emailed to visitors who left their address (Resend)." : <>Off: set <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> to email visitors your replies.</>}</Row>
+        <Row on title="Daily AI limit">Up to {me.aiDailyLimit} AI answers a day, then new questions come straight to you. {me.notify ? "You're emailed at 80% and 100%." : null} Set <code>AI_DAILY_LIMIT</code> to change it.</Row>
+        <Row on={me.blockedCountries.length > 0} title="Blocked countries">{me.blockedCountries.length
+          ? <>The chat doesn&apos;t appear for visitors from {me.blockedCountries.map(countryName).join(", ")}.</>
+          : <>Off: set <code>BLOCKED_COUNTRIES</code> to two-letter codes, e.g. <code>PK, BD</code>, to turn the chat off there.</>} Cloudflare knows each visitor&apos;s country; a VPN can get around it.</Row>
+        <Row on title="Abuse protection">Abuse, link spam, repeated messages and requests to make images or other work for free get a short reply with no AI call. The third closes the chat and blocks the visitor&apos;s address for a day (a month the second time). Each chat gets at most 15 AI answers, and each address 40 a day.</Row>
         <Row on={!!me.notify} title="Alerts to you">{me.notify ? `New hand-offs are emailed to ${me.notify}.` : <>Off: set <code>NOTIFY_EMAIL</code> to be emailed when someone is waiting for a reply.</>}</Row>
       </div>
       <section className="space-y-2">
