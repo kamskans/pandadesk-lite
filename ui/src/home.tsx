@@ -24,15 +24,11 @@ const FEATURES = [
   { title: "Your look", body: "Your colour, greeting and starter questions, with a live preview while you change them." },
 ];
 
-const KEYS = `# Required: the password for /admin
+const KEYS = `# The only thing it needs: the password for /admin
 npx wrangler secret put ADMIN_PASSWORD
 
-# Optional: any OpenAI-compatible API (OpenRouter, OpenAI, Anthropic…)
-npx wrangler secret put LLM_API_KEY
-# Without it, answers use Cloudflare Workers AI.
-
-# Optional: email visitors your replies, and alert you (Resend)
-npx wrangler secret put RESEND_API_KEY`;
+# Your AI key and email are added later,
+# on the admin page under Settings.`;
 
 const LITE = ["One website, one admin", "AI answers from your website and text", "Pinned answers", "Hand-off by email, simple inbox", "Your own Cloudflare account and keys", "Free and open source (AGPL-3.0)"];
 const CLOUD_FEATURES = ["Several apps, each with its own help center", "Team inbox: assign, labels, snooze, saved replies", "An AI agent that looks up your customers' own data", "Learns from your team's replies, finds unanswered questions", "Reports, ratings, business hours, webhooks", "Set up and run from Claude Code, Cursor or Codex"];
@@ -116,7 +112,7 @@ function Home() {
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
             <div>
               <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">Your keys, your data</h2>
-              <p className="mt-4 max-w-md text-stone-600">Settings are environment variables on your Worker. Use the AI provider you already pay for, or none at all: Cloudflare&apos;s own models work out of the box.</p>
+              <p className="mt-4 max-w-md text-stone-600">Deploy with just an admin password, then add keys on the admin page whenever you're ready. Use the AI provider you already pay for, or none at all: Cloudflare&apos;s own models work out of the box.</p>
               <ul className="mt-6 space-y-2 text-[15px] text-stone-700">
                 <li className="flex gap-2.5"><LogoMark className="mt-0.5 h-4 w-4 shrink-0" />Conversations stay in your own D1 database</li>
                 <li className="flex gap-2.5"><LogoMark className="mt-0.5 h-4 w-4 shrink-0" />Search by meaning with Cloudflare Vectorize</li>

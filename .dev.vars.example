@@ -1,8 +1,2 @@
-# Password for /admin. Required.
+# Password for /admin. The only thing PandaDesk Lite needs to deploy; everything else is set on the admin page later.
 ADMIN_PASSWORD=
-# Key for LLM_BASE_URL (OpenRouter, OpenAI, Anthropic...). Optional: without it, answers use Workers AI.
-LLM_API_KEY=
-# Optional: email the team when a visitor asks for a person, and email visitors your replies. Uses Resend.
-RESEND_API_KEY=
-EMAIL_FROM=
-NOTIFY_EMAIL=

@@ -6,6 +6,7 @@ import { addText, addWebsite, processPending, queueResync, removePinned, removeS
 import { adminCookie, clearAdminCookie, clientIp, isAdmin, limit, same } from "./security.ts";
 import { getSettings, saveSettings } from "./settings.ts";
 import { blockedCountries } from "./abuse.ts";
+import { configStatus, saveConfig } from "./config.ts";
 
 const id = (s: string | undefined) => {
   const n = Number(s);
@@ -141,6 +142,11 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
     if (m === "POST") {
       try { return json(await saveSettings(env, await body(req, 10_000))); } catch (err) { if (err instanceof HttpError) throw err; throw new HttpError(400, (err as Error).message); }
     }
+  }
+
+  if (section === "config") {
+    if (m === "GET") return json(await configStatus(env));
+    if (m === "POST") { await saveConfig(env, await body(req, 10_000)); return json({ ok: true }); }
   }
 
   if (section === "export" && m === "GET") {

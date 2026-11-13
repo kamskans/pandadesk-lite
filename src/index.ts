@@ -1,13 +1,16 @@
 import { handleAdmin } from "./admin.ts";
 import { handleChat } from "./chat.ts";
+import { withConfig } from "./config.ts";
 import { HttpError, fail, type Env } from "./env.ts";
 import { processPending, queueResync } from "./knowledge.ts";
 
 export default {
-  async fetch(req, env, ctx): Promise<Response> {
+  async fetch(req, workerEnv, ctx): Promise<Response> {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
     try {
+      // AI and email settings saved on the admin page take over from the Worker's own.
+      const env = parts[0] === "api" ? await withConfig(workerEnv) : workerEnv;
       if (parts[0] === "api" && parts[1] === "admin") return await handleAdmin(req, env, ctx, parts.slice(2));
       if (parts[0] === "api") return await handleChat(req, env, parts.slice(1));
       if (url.pathname === "/admin" || url.pathname === "/admin/") return env.ASSETS.fetch(new Request(new URL("/admin.html", url), req));
@@ -20,8 +23,9 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx) {
+  async scheduled(_event, workerEnv, ctx) {
     ctx.waitUntil((async () => {
+      const env = await withConfig(workerEnv);
       await queueResync(env);
       await processPending(env);
       await env.DB.prepare("delete from rate where reset_at < unixepoch() - 86400").run();

@@ -61,7 +61,7 @@ async function spendDailyAnswer(req: Request, env: Env) {
       ? `Your chat has used all ${max} of today's AI answers. For the next 24 hours, new questions go to you without an AI answer.`
       : `Your chat has used ${used} of today's ${max} AI answers. After ${max}, new questions go to you without an AI answer.`;
     await sendEmail(env, env.NOTIFY_EMAIL, level === 100 ? "AI answers used up for today" : "80% of today's AI answers used",
-      `${text}\n\nIf that's more than usual, check the inbox for a visitor sending a lot of messages. Change the limit with AI_DAILY_LIMIT.\n\n${new URL(req.url).origin}/admin`);
+      `${text}\n\nIf that's more than usual, check the inbox for a visitor sending a lot of messages. Change the limit on the Settings page.\n\n${new URL(req.url).origin}/admin`);
   }
   return ok;
 }

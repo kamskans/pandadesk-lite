@@ -28,5 +28,21 @@
     "marked": "18.1.1",
     "react": "19.1.10",
     "react-dom": "19.1.10"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_PASSWORD": {
+        "description": "The password for your admin page at `/admin`. Pick a long one, e.g. from `openssl rand -base64 24`. Your AI key, email and everything else are set on the admin page after deploying."
+      },
+      "DB": {
+        "description": "Stores your knowledge, chats and settings."
+      },
+      "VECTORS": {
+        "description": "Search by meaning. Optional: without it, search uses keywords."
+      },
+      "AI": {
+        "description": "Cloudflare Workers AI: makes the search index, and answers questions until you add your own AI key."
+      }
+    }
   }
 }

@@ -25,11 +25,10 @@ npx wrangler login
 # Search by meaning needs a Vectorize index; without it, search uses keywords only.
 npx wrangler vectorize create pandadesk-lite --dimensions=1024 --metric=cosine
 npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put LLM_API_KEY      # optional: leave out to use Workers AI
 npm run deploy
 ```
 
-The Worker's home page describes PandaDesk Lite and has a live demo of your chat; change it in `ui/src/home.tsx`. Then open `https://<your-worker>.workers.dev/admin`, sign in, add your website under **Knowledge**, and copy the snippet from **Install** into your site:
+The Worker's home page describes PandaDesk Lite and has a live demo of your chat; change it in `ui/src/home.tsx`. Then open `https://<your-worker>.workers.dev/admin`, sign in, add your AI key under **Settings** if you have one, add your website under **Knowledge**, and copy the snippet from **Install** into your site:
 
 ```html
 <script src="https://<your-worker>.workers.dev/widget.js" async></script>
@@ -37,25 +36,22 @@ The Worker's home page describes PandaDesk Lite and has a live demo of your chat
 
 ## Settings
 
-Secrets (`npx wrangler secret put NAME`, or `.dev.vars` locally; see `.dev.vars.example`):
+The only thing you need to deploy is **`ADMIN_PASSWORD`**, the password for `/admin` (the Deploy button asks for it). Changing it signs you out everywhere.
 
-| Name | |
-|---|---|
-| `ADMIN_PASSWORD` | Required. Password for `/admin`. Changing it signs you out everywhere. |
-| `LLM_API_KEY` | Key for `LLM_BASE_URL`. Without it, answers use Workers AI (Llama 3.3 70B). |
-| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. Send email through [Resend](https://resend.com): your replies to visitors, and alerts to you. |
-| `NOTIFY_EMAIL` | Optional. Where to email you when someone is waiting for a reply. |
+Everything else is optional and set on the admin page under **Settings**, any time after deploying:
 
-Variables (in `wrangler.jsonc`):
-
-| Name | Default | |
+| Setting | Default | |
 |---|---|---|
-| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | Any OpenAI-compatible API. |
-| `LLM_MODEL` | `openai/gpt-4o-mini` | The model name for that API. |
-| `SITE_NAME` | `Support` | Default chat title. You can change it in the admin. |
-| `MAX_PAGES` | `300` | Most pages read per website. |
-| `AI_DAILY_LIMIT` | `500` | AI answers per day. After that, new questions go straight to you. With `NOTIFY_EMAIL` set, you're emailed at 80% and 100%. |
-| `BLOCKED_COUNTRIES` | (empty) | Two-letter country codes to turn the chat off for, e.g. `PK, BD`. The button doesn't appear there. Cloudflare provides each visitor's country, though a VPN can get around it. |
+| AI API key | none | Any OpenAI-compatible API (OpenRouter, OpenAI, Anthropic, Groq…). Without it, answers use Workers AI (Llama 3.3 70B). |
+| AI API address, model | `https://openrouter.ai/api/v1`, `openai/gpt-4o-mini` | The API that key belongs to, and the model name for it. |
+| Resend API key, send from | none | Send email through [Resend](https://resend.com): your replies to visitors, and alerts to you. |
+| Send alerts to | none | Where you're emailed when someone is waiting for a reply, and at 80% and 100% of the daily AI limit. |
+| AI answers per day | `500` | After that, new questions go straight to you. |
+| Blocked countries | none | Two-letter country codes to turn the chat off for, e.g. `PK, BD`. The button doesn't appear there. Cloudflare provides each visitor's country, though a VPN can get around it. |
+
+Keys saved on the admin page are stored in your D1 database and never shown again, only their last 4 characters.
+
+If you'd rather keep them on the Worker, each has a secret or variable of the same name: `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFY_EMAIL`, `AI_DAILY_LIMIT` and `BLOCKED_COUNTRIES` (`npx wrangler secret put NAME`, or `vars` in `wrangler.jsonc`). A value saved on the admin page takes over from the Worker's; remove it there to use the Worker's again.
 
 ## How it works
 
@@ -77,7 +73,7 @@ npm run dev                      # builds ui/, then http://localhost:8787/admin
 npm test && npm run typecheck
 ```
 
-Workers AI and Vectorize run on Cloudflare even in local development, so `wrangler dev` asks you to sign in for them. Leaving them out of `wrangler.jsonc` locally falls back to keyword search. Set `LLM_API_KEY` to answer without Workers AI.
+Workers AI and Vectorize run on Cloudflare even in local development, so `wrangler dev` asks you to sign in for them. Leaving them out of `wrangler.jsonc` locally falls back to keyword search. Add an AI key under Settings (or `LLM_API_KEY` in `.dev.vars`) to answer without Workers AI.
 
 ## License
 
