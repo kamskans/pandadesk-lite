@@ -3,7 +3,8 @@ import { block, blocked, countryBlocked, ipKey, screen, STRIKE_REPLIES, STRIKES_
 import { sendEmail } from "./email.ts";
 import { HttpError, body, json, now, str, type Env } from "./env.ts";
 import { ftsQuery, search } from "./knowledge.ts";
-import { clientIp, hit, limit, randomToken, same, sha256 } from "./security.ts";
+import { clientIp, hit, limit, randomToken, same, sha256, verifyIdentity } from "./security.ts";
+import { allowedOrigins } from "./config.ts";
 import { getSettings } from "./settings.ts";
 
 export interface Conversation { id: string; token_hash: string; email: string | null; name: string | null; status: string; unread: number; strikes: number; page_url: string | null; created_at: number; updated_at: number }
@@ -66,11 +67,25 @@ async function spendDailyAnswer(req: Request, env: Env) {
   return ok;
 }
 
+/**
+ * Whether a site may show the chat. With no allowed sites set, any site may. The chat's own pages (same origin, or
+ * no Origin header on a same-origin GET) are always allowed.
+ */
+export function originAllowed(env: Env, req: Request, origin: string | null | undefined) {
+  const allowed = allowedOrigins(env);
+  if (!allowed.length || !origin) return true;
+  let o: string;
+  try { o = new URL(origin).origin; } catch { return false; }
+  return o === new URL(req.url).origin || allowed.includes(o);
+}
+
 export async function handleChat(req: Request, env: Env, path: string[]): Promise<Response> {
   const ip = clientIp(req);
   // Turned off for this visitor's country: the widget doesn't mount on a 403 from /config.
   if (countryBlocked(req, env)) return json({ error: UNAVAILABLE, unavailable: true }, 403, { "access-control-allow-origin": "*" });
   if (path[0] === "config" && req.method === "GET") {
+    // A site that isn't on the allowed list gets the same answer as a blocked country: the button never appears.
+    if (!originAllowed(env, req, req.headers.get("origin"))) return json({ error: "Chat isn't available on this site.", unavailable: true }, 403, { "access-control-allow-origin": "*" });
     const s = await getSettings(env);
     // The widget script reads the colour from the customer's own site, so this public endpoint allows any origin.
     return json({ ...s, branding: true }, 200, { "access-control-allow-origin": "*" });
@@ -81,12 +96,15 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
     await limit(env, `start:${ip}`, 20, 3600);
     if (await blocked(env, ip)) throw new HttpError(403, PAUSED);
     const input = await body(req, 5000);
+    const pageUrl = str(input.pageUrl, 500) || null;
+    if (pageUrl && !originAllowed(env, req, pageUrl)) throw new HttpError(403, "Chat isn't available on this site.");
+    const who = await verifyIdentity(env, input.identity as Record<string, unknown> | undefined);
     const id = crypto.randomUUID();
     const token = randomToken();
     const t = now();
-    await env.DB.prepare("insert into conversations (id, token_hash, page_url, created_at, updated_at) values (?, ?, ?, ?, ?)")
-      .bind(id, await sha256(token), str(input.pageUrl, 500) || null, t, t).run();
-    return json({ id, token, status: "bot" });
+    await env.DB.prepare("insert into conversations (id, token_hash, page_url, email, name, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, await sha256(token), pageUrl, who?.email ?? null, who?.name ?? null, t, t).run();
+    return json({ id, token, status: "bot", email: who?.email ?? null });
   }
 
   const conv = await visitorConversation(req, env, path[1]);
@@ -179,6 +197,16 @@ export async function handleChat(req: Request, env: Env, path: string[]): Promis
     if (conv.status === "bot" || conv.status === "closed") await handOff(req, env, conv, "Asked to talk to a person.");
     const msg = conv.email ? "Okay, I've let the team know. They'll reply here and by email." : "Okay, I've let the team know. Leave your email so they can get back to you.";
     return json({ status: "waiting", messages: [visible(await addMessage(env, conv.id, "bot", msg))] });
+  }
+
+  // A signed-in visitor from your own app: attach their email and name to this chat. A chat that already belongs to a
+  // different address is never taken over; the widget starts a new chat instead.
+  if (action === "identify" && req.method === "POST") {
+    const who = await verifyIdentity(env, (await body(req, 5000)).identity as Record<string, unknown> | undefined);
+    if (!who) throw new HttpError(400, "identity not accepted");
+    if (conv.email && conv.email !== who.email) throw new HttpError(409, "this chat belongs to someone else");
+    await env.DB.prepare("update conversations set email = ?, name = coalesce(?, name), updated_at = ? where id = ?").bind(who.email, who.name, now(), conv.id).run();
+    return json({ status: conv.status, email: who.email, messages: [] });
   }
 
   if (action === "email" && req.method === "POST") {

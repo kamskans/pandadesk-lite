@@ -44,14 +44,43 @@ Everything else is optional and set on the admin page under **Settings**, any ti
 |---|---|---|
 | AI API key | none | Any OpenAI-compatible API (OpenRouter, OpenAI, Anthropic, Groq…). Without it, answers use Workers AI (Llama 3.3 70B). |
 | AI API address, model | `https://openrouter.ai/api/v1`, `openai/gpt-4o-mini` | The API that key belongs to, and the model name for it. |
-| Resend API key, send from | none | Send email through [Resend](https://resend.com): your replies to visitors, and alerts to you. |
+| Brevo or Resend API key, send from | none | Send email through [Brevo](https://www.brevo.com) or [Resend](https://resend.com): your replies to visitors, and alerts to you. Brevo is used if both are set. |
 | Send alerts to | none | Where you're emailed when someone is waiting for a reply, and at 80% and 100% of the daily AI limit. |
 | AI answers per day | `500` | After that, new questions go straight to you. |
 | Blocked countries | none | Two-letter country codes to turn the chat off for, e.g. `PK, BD`. The button doesn't appear there. Cloudflare provides each visitor's country, though a VPN can get around it. |
+| Allowed sites | any site | Full addresses of the sites that may show the chat, e.g. `https://app.example.com`. Other sites get no button, can't start a chat and can't frame the chat page. |
+| Identity secret | none | Lets your own app tell the chat who a signed-in visitor is. See [Signed-in visitors](#signed-in-visitors). |
 
 Keys saved on the admin page are stored in your D1 database and never shown again, only their last 4 characters.
 
-If you'd rather keep them on the Worker, each has a secret or variable of the same name: `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFY_EMAIL`, `AI_DAILY_LIMIT` and `BLOCKED_COUNTRIES` (`npx wrangler secret put NAME`, or `vars` in `wrangler.jsonc`). A value saved on the admin page takes over from the Worker's; remove it there to use the Worker's again.
+If you'd rather keep them on the Worker, each has a secret or variable of the same name: `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `BREVO_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFY_EMAIL`, `AI_DAILY_LIMIT`, `BLOCKED_COUNTRIES`, `ALLOWED_ORIGINS` and `IDENTITY_SECRET` (`npx wrangler secret put NAME`, or `vars` in `wrangler.jsonc`). A value saved on the admin page takes over from the Worker's; remove it there to use the Worker's again.
+
+## Signed-in visitors
+
+If your app has its own sign-in, it can tell the chat who the visitor is. Their name and email then show in your inbox, and they aren't asked for an email when the chat is passed to you.
+
+1. Set an **Identity secret** on the Settings page (e.g. `openssl rand -hex 32`) and give the same value to your app's server.
+2. On your server, sign the signed-in user, valid for an hour:
+
+   ```js
+   import { createHmac } from "node:crypto";
+   const issuedAt = Math.floor(Date.now() / 1000);
+   const email = user.email.trim().toLowerCase();
+   const payload = ["pandadesk-lite-identity:v1", email, user.id, issuedAt].join("\n");
+   const signature = createHmac("sha256", process.env.PANDADESK_IDENTITY_SECRET).update(payload).digest("hex");
+   // send { email, userId: user.id, name, issuedAt, signature } to the page
+   ```
+
+3. On the page, before or after the widget script:
+
+   ```html
+   <script>
+     window.PandaDesk = window.PandaDesk || function () { (window.PandaDesk.q = window.PandaDesk.q || []).push(arguments) };
+     PandaDesk("identify", identity); // the object from your server
+   </script>
+   ```
+
+Only your server can sign, so a visitor can't pretend to be someone else. A saved chat that belongs to a different email (someone else signed in on the same browser) is never reopened; a new chat starts instead.
 
 ## How it works
 

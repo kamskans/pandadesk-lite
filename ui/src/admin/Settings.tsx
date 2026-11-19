@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { Check, Minus } from "lucide-react";
 import { api, primary } from "./api";
 
-interface Me { llm: string; vectors: boolean; email: boolean; notify: string | null; aiDailyLimit: number; blockedCountries: string[] }
+interface Me { llm: string; vectors: boolean; email: boolean; emailProvider: string; notify: string | null; aiDailyLimit: number; blockedCountries: string[]; identity: boolean; allowedOrigins: string[] }
 type Source = "admin" | "worker" | null;
 interface Secret { set: boolean; hint: string | null; source: Source }
 interface Plain { value: string; source: Source }
 interface Config {
   LLM_API_KEY: Secret; LLM_BASE_URL: Plain; LLM_MODEL: Plain;
-  RESEND_API_KEY: Secret; EMAIL_FROM: Plain; NOTIFY_EMAIL: Plain;
-  AI_DAILY_LIMIT: Plain; BLOCKED_COUNTRIES: Plain;
+  RESEND_API_KEY: Secret; BREVO_API_KEY: Secret; EMAIL_FROM: Plain; NOTIFY_EMAIL: Plain;
+  AI_DAILY_LIMIT: Plain; BLOCKED_COUNTRIES: Plain; IDENTITY_SECRET: Secret; ALLOWED_ORIGINS: Plain;
 }
-type PlainName = "LLM_BASE_URL" | "LLM_MODEL" | "EMAIL_FROM" | "NOTIFY_EMAIL" | "AI_DAILY_LIMIT" | "BLOCKED_COUNTRIES";
-type SecretName = "LLM_API_KEY" | "RESEND_API_KEY";
+type PlainName = "LLM_BASE_URL" | "LLM_MODEL" | "EMAIL_FROM" | "NOTIFY_EMAIL" | "AI_DAILY_LIMIT" | "BLOCKED_COUNTRIES" | "ALLOWED_ORIGINS";
+type SecretName = "LLM_API_KEY" | "RESEND_API_KEY" | "BREVO_API_KEY" | "IDENTITY_SECRET";
 
 const field = "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-500";
 const countryName = (code: string) => { try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code; } catch { return code; } };
@@ -54,7 +54,7 @@ export default function Settings() {
   const load = async () => {
     const [m, c] = await Promise.all([api<Me>("/me"), api<Config>("/config")]);
     setMe(m); setCfg(c); setKeys({});
-    const values = { LLM_BASE_URL: c.LLM_BASE_URL.value, LLM_MODEL: c.LLM_MODEL.value, EMAIL_FROM: c.EMAIL_FROM.value, NOTIFY_EMAIL: c.NOTIFY_EMAIL.value, AI_DAILY_LIMIT: c.AI_DAILY_LIMIT.value, BLOCKED_COUNTRIES: c.BLOCKED_COUNTRIES.value };
+    const values = { LLM_BASE_URL: c.LLM_BASE_URL.value, LLM_MODEL: c.LLM_MODEL.value, EMAIL_FROM: c.EMAIL_FROM.value, NOTIFY_EMAIL: c.NOTIFY_EMAIL.value, AI_DAILY_LIMIT: c.AI_DAILY_LIMIT.value, BLOCKED_COUNTRIES: c.BLOCKED_COUNTRIES.value, ALLOWED_ORIGINS: c.ALLOWED_ORIGINS.value };
     setPlain(values); setLoaded(values);
   };
   useEffect(() => { load().catch(() => {}); }, []);
@@ -114,11 +114,14 @@ export default function Settings() {
         <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5">
           <div>
             <h2 className="font-semibold">Email</h2>
-            <p className="text-sm text-stone-500">Sent with <a href="https://resend.com" target="_blank" rel="noreferrer" className="underline">Resend</a>: your replies go to visitors who left their address, and you get an alert when someone is waiting.</p>
+            <p className="text-sm text-stone-500">Sent with <a href="https://www.brevo.com" target="_blank" rel="noreferrer" className="underline">Brevo</a> or <a href="https://resend.com" target="_blank" rel="noreferrer" className="underline">Resend</a> (add one key; Brevo is used if both are set): your replies go to visitors who left their address, and you get an alert when someone is waiting.</p>
           </div>
-          <Label title="Resend API key" note={fromWorker(cfg.RESEND_API_KEY.source) || undefined}>{secret("RESEND_API_KEY", "re_…")}</Label>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Label title="Send from" note="An address on a domain verified in Resend.">{text("EMAIL_FROM", { placeholder: "Support <help@yourdomain.com>" })}</Label>
+            <Label title="Brevo API key" note={fromWorker(cfg.BREVO_API_KEY.source) || undefined}>{secret("BREVO_API_KEY", "xkeysib-…")}</Label>
+            <Label title="Resend API key" note={fromWorker(cfg.RESEND_API_KEY.source) || undefined}>{secret("RESEND_API_KEY", "re_…")}</Label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Label title="Send from" note="An address on a domain verified with your email provider.">{text("EMAIL_FROM", { placeholder: "Support <help@yourdomain.com>" })}</Label>
             <Label title="Send alerts to" note="Where you're told someone is waiting.">{text("NOTIFY_EMAIL", { type: "email", placeholder: "you@yourdomain.com" })}</Label>
           </div>
         </section>
@@ -129,6 +132,15 @@ export default function Settings() {
             <Label title="AI answers per day" note="After this, new questions come straight to you.">{text("AI_DAILY_LIMIT", { inputMode: "numeric", placeholder: "500" })}</Label>
             <Label title="Blocked countries" note={<>Two-letter codes, e.g. <code>PK, BD</code>. A VPN can get around it.</>}>{text("BLOCKED_COUNTRIES", { placeholder: "None" })}</Label>
           </div>
+        </section>
+
+        <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5">
+          <div>
+            <h2 className="font-semibold">Your site</h2>
+            <p className="text-sm text-stone-500">Optional. Limit where the chat appears, and let your own app tell the chat who a signed-in visitor is.</p>
+          </div>
+          <Label title="Allowed sites" note={<>Full addresses, e.g. <code>https://app.example.com</code>. Empty: any site can show the chat.</>}>{text("ALLOWED_ORIGINS", { placeholder: "Any site" })}</Label>
+          <Label title="Identity secret" note={<>Shared with your app&apos;s server, which signs each signed-in visitor (see the README). At least 16 characters.{fromWorker(cfg.IDENTITY_SECRET.source)}</>}>{secret("IDENTITY_SECRET", "e.g. from openssl rand -hex 32")}</Label>
         </section>
 
         <div className="flex items-center gap-3">
@@ -143,12 +155,14 @@ export default function Settings() {
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           <Row on title="AI model">Answers use {me.llm}.</Row>
           <Row on={me.vectors} title="Search by meaning">{me.vectors ? "On (Cloudflare Vectorize)." : "Off: create the Vectorize index from the README. Keyword search still works."}</Row>
-          <Row on={me.email} title="Email to visitors">{me.email ? "Your replies are also emailed to visitors who left their address." : "Off: add a Resend key and a sender above."}</Row>
-          <Row on={!!me.notify && me.email} title="Alerts to you">{me.notify && me.email ? `New hand-offs are emailed to ${me.notify}.` : "Off: add a Resend key, a sender and an alert address above."}</Row>
+          <Row on={me.email} title="Email to visitors">{me.email ? `Your replies are also emailed (with ${me.emailProvider}) to visitors who left their address.` : "Off: add a Brevo or Resend key and a sender above."}</Row>
+          <Row on={!!me.notify && me.email} title="Alerts to you">{me.notify && me.email ? `New hand-offs are emailed to ${me.notify}.` : "Off: add a Brevo or Resend key, a sender and an alert address above."}</Row>
           <Row on title="Daily AI limit">Up to {me.aiDailyLimit} AI answers a day, then new questions come straight to you.</Row>
           <Row on={me.blockedCountries.length > 0} title="Blocked countries">{me.blockedCountries.length
             ? <>The chat doesn&apos;t appear for visitors from {me.blockedCountries.map(countryName).join(", ")}.</>
             : "Off: the chat is available everywhere."}</Row>
+          <Row on={me.allowedOrigins.length > 0} title="Allowed sites">{me.allowedOrigins.length ? <>The chat only appears on {me.allowedOrigins.join(", ")}.</> : "Off: any site can show the chat."}</Row>
+          <Row on={me.identity} title="Signed-in visitors">{me.identity ? "On: visitors your app signs in are named in the inbox and aren't asked for their email." : "Off: visitors are anonymous until they leave their email."}</Row>
           <Row on title="Abuse protection">Abuse, link spam, repeated messages and requests to make images or other work for free get a short reply with no AI call. The third closes the chat and blocks the visitor&apos;s address for a day (a month the second time). Each chat gets at most 15 AI answers, and each address 40 a day.</Row>
         </div>
       </section>
