@@ -10,10 +10,13 @@ export const FIELDS = {
   LLM_BASE_URL: { secret: false, max: 300 },
   LLM_MODEL: { secret: false, max: 200 },
   RESEND_API_KEY: { secret: true, max: 500 },
+  BREVO_API_KEY: { secret: true, max: 500 },
   EMAIL_FROM: { secret: false, max: 200 },
   NOTIFY_EMAIL: { secret: false, max: 200 },
   AI_DAILY_LIMIT: { secret: false, max: 7 },
   BLOCKED_COUNTRIES: { secret: false, max: 500 },
+  IDENTITY_SECRET: { secret: true, max: 500 },
+  ALLOWED_ORIGINS: { secret: false, max: 1000 },
 } as const;
 export type Field = keyof typeof FIELDS;
 const NAMES = Object.keys(FIELDS) as Field[];
@@ -73,8 +76,21 @@ function check(name: Field, v: string) {
     if (bad) throw new HttpError(400, `"${bad}" isn't a two-letter country code`);
     return [...new Set(codes)].join(", ");
   }
+  if (name === "ALLOWED_ORIGINS") {
+    const list = v.split(/[\s,;]+/).filter(Boolean).map((o) => {
+      let u: URL;
+      try { u = new URL(o); } catch { throw new HttpError(400, `"${o}" isn't a full site address, like https://app.example.com`); }
+      if (u.protocol !== "https:" && u.hostname !== "localhost") throw new HttpError(400, `"${o}" must start with https://`);
+      return u.origin;
+    });
+    return [...new Set(list)].join(", ");
+  }
+  if (name === "IDENTITY_SECRET" && v.length < 16) throw new HttpError(400, "the identity secret must be at least 16 characters");
   return v;
 }
+
+/** The allowed sites as origins, or [] for any site. */
+export const allowedOrigins = (env: Env) => (env.ALLOWED_ORIGINS ?? "").split(/[\s,;]+/).filter(Boolean).map((o) => { try { return new URL(o).origin; } catch { return ""; } }).filter(Boolean);
 
 /**
  * Save what the Settings page sent. A field left out stays as it is; an empty string removes the admin page's value,

@@ -2,6 +2,7 @@
  * PandaDesk Lite chat loader. Add before </body>:
  *   <script src="https://YOUR-WORKER.workers.dev/widget.js" async></script>
  * Optional: PandaDesk('open' | 'close' | 'toggle')
+ *   PandaDesk('identify', identity)  - a signed-in visitor, signed by your server (see README)
  */
 (function () {
   if (window.__pandadeskLoaded) return;
@@ -13,6 +14,7 @@
   var position = script.getAttribute("data-position") === "left" ? "left" : "right";
   var queue = (window.PandaDesk && window.PandaDesk.q) || [];
   var open = false;
+  var identity = null;
   var unread = false;
   var textColor = "#fff";
   var chatIcon = '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>';
@@ -70,7 +72,7 @@
 
   window.addEventListener("message", function (e) {
     if (e.origin !== origin || !e.data || !e.data.pandadesk) return;
-    if (e.data.type === "ready" && open) post({ type: "focus" });
+    if (e.data.type === "ready") { if (identity) post({ type: "identify", identity: identity }); if (open) post({ type: "focus" }); }
     if (e.data.type === "unread") { unread = !!e.data.unread && !open; draw(); }
     if (e.data.type === "close") setOpen(false);
   });
@@ -79,6 +81,10 @@
     if (cmd === "open") setOpen(true);
     else if (cmd === "close") setOpen(false);
     else if (cmd === "toggle") setOpen(!open);
+    else if (cmd === "identify" && arguments[1] && typeof arguments[1] === "object") {
+      identity = arguments[1];
+      if (frameLoaded) post({ type: "identify", identity: identity });
+    }
   }
   window.PandaDesk = api;
 

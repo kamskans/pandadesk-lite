@@ -35,6 +35,8 @@ export default function Messenger({ config, embedded = true, preview = false }: 
   const lastPoll = useRef(0);
   const seenReplies = useRef<number | null>(null);
   const page = useRef<string | null>(null);
+  // A signed-in visitor's identity from the host page (PandaDesk('identify', …)), checked by the server.
+  const identity = useRef<unknown>(null);
 
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const res = await fetch(`/api${path}`, {
@@ -81,6 +83,17 @@ export default function Messenger({ config, embedded = true, preview = false }: 
       if (e.source !== window.parent || !e.data?.pandadesk) return;
       if (e.data.type === "focus") { shown.current = true; input.current?.focus(); poll(); }
       if (e.data.type === "hidden") shown.current = false;
+      if (e.data.type === "identify" && e.data.identity) {
+        identity.current = e.data.identity;
+        if (conv.current) {
+          // Attach this visitor to the saved chat. If it belongs to someone else (another person signed in on this
+          // browser), forget it so their next message starts a new chat.
+          void call(`/conversations/${conv.current.id}/identify`, { method: "POST", body: JSON.stringify({ identity: identity.current }) }).then(async (res) => {
+            if (res?.ok) { const d = await res.json(); setEmail(d.email); }
+            else if (res?.status === 409) { save(null); conv.current = null; setMessages([]); setStatus("ai"); setHandedOff(false); setEmail(null); }
+          });
+        }
+      }
     };
     window.addEventListener("message", onMessage);
     if (embedded) window.parent?.postMessage({ pandadesk: true, type: "ready", brandColor: config.color }, "*");
@@ -97,8 +110,8 @@ export default function Messenger({ config, embedded = true, preview = false }: 
     setPending(body); setError(null);
     sending.current = true;
     if (!conv.current) {
-      const res = await call("/conversations", { method: "POST", body: JSON.stringify({ pageUrl: page.current }) });
-      if (res?.ok) { const c = await res.json(); conv.current = { id: c.id, token: c.token }; save(conv.current); }
+      const res = await call("/conversations", { method: "POST", body: JSON.stringify({ pageUrl: page.current, identity: identity.current }) });
+      if (res?.ok) { const c = await res.json(); conv.current = { id: c.id, token: c.token }; save(conv.current); if (c.email) setEmail(c.email); }
     }
     const res = conv.current ? await call(`/conversations/${conv.current.id}/messages`, { method: "POST", body: JSON.stringify({ body }) }) : null;
     if (res?.ok) apply(await res.json(), false);

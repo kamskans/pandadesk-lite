@@ -10,12 +10,18 @@ export interface Env {
   LLM_API_KEY?: string;
   MAX_PAGES?: string;
   RESEND_API_KEY?: string;
+  /** Brevo API key: used instead of Resend when set. */
+  BREVO_API_KEY?: string;
   EMAIL_FROM?: string;
   NOTIFY_EMAIL?: string;
   /** AI answers per day before new questions go straight to you (default 500). */
   AI_DAILY_LIMIT?: string;
   /** Two-letter country codes the chat is turned off for, e.g. "PK, BD". */
   BLOCKED_COUNTRIES?: string;
+  /** Shared secret for signed visitor identities from your own app (see README, "Signed-in visitors"). */
+  IDENTITY_SECRET?: string;
+  /** Sites allowed to show the chat, e.g. "https://app.example.com, https://staging.example.com". Empty: any site. */
+  ALLOWED_ORIGINS?: string;
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
