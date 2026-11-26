@@ -42,17 +42,17 @@ test("without a secret, or with junk, nothing is accepted", async () => {
 });
 
 test("sender addresses are split into name and email for Brevo", () => {
-  assert.deepEqual(parseFrom("StartAbroad Support <help@startabroad.com>"), { name: "StartAbroad Support", email: "help@startabroad.com" });
-  assert.deepEqual(parseFrom("help@startabroad.com"), { email: "help@startabroad.com" });
-  assert.deepEqual(parseFrom('"Support" <help@startabroad.com>'), { name: "Support", email: "help@startabroad.com" });
+  assert.deepEqual(parseFrom("Example Support <help@example.com>"), { name: "Example Support", email: "help@example.com" });
+  assert.deepEqual(parseFrom("help@example.com"), { email: "help@example.com" });
+  assert.deepEqual(parseFrom('"Support" <help@example.com>'), { name: "Support", email: "help@example.com" });
 });
 
 test("allowed sites: any site when unset, otherwise only the list and the Worker itself", () => {
   const req = new Request("https://chat.example.workers.dev/api/config");
   assert.equal(originAllowed({} as Env, req, "https://anything.com"), true);
-  const limited = { ALLOWED_ORIGINS: "https://app.startabroad.com, https://staging.startabroad.com" } as Env;
-  assert.equal(originAllowed(limited, req, "https://app.startabroad.com"), true);
-  assert.equal(originAllowed(limited, req, "https://app.startabroad.com/portugal/dashboard?x=1"), true);
+  const limited = { ALLOWED_ORIGINS: "https://app.example.com, https://staging.example.com" } as Env;
+  assert.equal(originAllowed(limited, req, "https://app.example.com"), true);
+  assert.equal(originAllowed(limited, req, "https://app.example.com/portugal/dashboard?x=1"), true);
   assert.equal(originAllowed(limited, req, "https://evil.example.com"), false);
   assert.equal(originAllowed(limited, req, "https://chat.example.workers.dev"), true);
   assert.equal(originAllowed(limited, req, null), true, "same-origin requests carry no Origin header");
